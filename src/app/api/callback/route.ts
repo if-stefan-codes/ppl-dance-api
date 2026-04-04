@@ -3,6 +3,13 @@ import { getTaskRecord, saveTaskRecord } from '@/lib/blob-job';
 
 type UnknownRecord = Record<string, unknown>;
 
+const KIE_COMPLETED_STATUSES = new Set([
+  'succeed',
+  'succeeded',
+  'success',
+  'completed',
+]);
+
 function asRecord(v: unknown): UnknownRecord | null {
   return v != null && typeof v === 'object' && !Array.isArray(v)
     ? (v as UnknownRecord)
@@ -34,15 +41,70 @@ function statusFromWork(work: UnknownRecord): string | null {
   return firstString(work.status, work.state, work.taskStatus);
 }
 
+function normalizeKieStatus(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  if (KIE_COMPLETED_STATUSES.has(key)) return 'completed';
+  return raw.trim();
+}
+
+/**
+ * kie.ai order: works[0].url → works[0] (string) → data.video_url, then other work fields.
+ */
+function extractVideoUrl(
+  payload: unknown,
+  works: UnknownRecord[],
+  worksRaw: unknown[]
+): string | null {
+  const w0 = works[0];
+  if (w0) {
+    const directUrl = firstString(w0.url);
+    if (directUrl) return directUrl;
+  }
+
+  const firstRaw = worksRaw[0];
+  if (typeof firstRaw === 'string' && firstRaw.trim()) {
+    return firstRaw.trim();
+  }
+
+  const root = asRecord(payload);
+  const data = root ? asRecord(root.data) : null;
+  const fromData = firstString(data?.video_url, data?.videoUrl);
+  if (fromData) return fromData;
+
+  if (w0) {
+    const fromWork = videoUrlFromWork(w0);
+    if (fromWork) return fromWork;
+  }
+
+  return works.map(videoUrlFromWork).find(Boolean) ?? null;
+}
+
+function rawStatusFromPayload(
+  payload: unknown,
+  primary: UnknownRecord
+): string | null {
+  const root = asRecord(payload);
+  const data = root ? asRecord(root.data) : null;
+  return firstString(
+    statusFromWork(primary),
+    root?.status,
+    root?.state,
+    data?.status,
+    data?.state,
+    data?.taskStatus
+  );
+}
+
 /**
  * Extract taskId and works[] from kie.ai webhook body (flexible shapes).
  */
 function parseKieCallback(payload: unknown): {
   taskId: string | null;
   works: UnknownRecord[];
+  worksRaw: unknown[];
 } {
   const root = asRecord(payload);
-  if (!root) return { taskId: null, works: [] };
+  if (!root) return { taskId: null, works: [], worksRaw: [] };
 
   const taskId =
     firstString(
@@ -59,15 +121,18 @@ function parseKieCallback(payload: unknown): {
   if (worksRaw == null && root.result != null)
     worksRaw = asRecord(root.result)?.works;
 
+  const arr = Array.isArray(worksRaw) ? worksRaw : [];
   const works: UnknownRecord[] = [];
-  if (Array.isArray(worksRaw)) {
-    for (const item of worksRaw) {
-      const w = asRecord(item);
-      if (w) works.push(w);
+  for (const item of arr) {
+    if (typeof item === 'string' && item.trim()) {
+      works.push({ url: item.trim() });
+      continue;
     }
+    const w = asRecord(item);
+    if (w) works.push(w);
   }
 
-  return { taskId, works };
+  return { taskId, works, worksRaw: arr };
 }
 
 export async function GET() {
@@ -77,7 +142,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
-    console.log('[api/callback] raw request body', rawBody);
+    console.log(
+      '[api/callback] full raw kie.ai request body',
+      rawBody
+    );
 
     let payload: unknown;
     try {
@@ -87,7 +155,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    const { taskId, works } = parseKieCallback(payload);
+    const { taskId, works, worksRaw } = parseKieCallback(payload);
     console.log('[api/callback] extracted taskId', taskId);
 
     if (!taskId) {
@@ -98,10 +166,14 @@ export async function POST(request: Request) {
     }
 
     const primary = works[0] ?? {};
-    const videoUrl = works.map(videoUrlFromWork).find(Boolean) ?? null;
-    const status =
-      statusFromWork(primary) ||
-      (videoUrl ? 'completed' : 'processing');
+    const videoUrl = extractVideoUrl(payload, works, worksRaw);
+
+    const rawStatus = rawStatusFromPayload(payload, primary);
+    const status = rawStatus
+      ? normalizeKieStatus(rawStatus)
+      : videoUrl
+        ? 'completed'
+        : 'processing';
 
     await saveTaskRecord(taskId, { status, videoUrl });
     const afterSave = await getTaskRecord(taskId);
