@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { corsHeaders } from '@/lib/cors';
 import { getPublicBaseUrl } from '@/lib/public-url';
 
 const DEFAULT_KIE_CREATE_URL =
@@ -6,13 +7,17 @@ const DEFAULT_KIE_CREATE_URL =
 
 const KIE_CREATE_TASK_MODEL = 'kling-3.0/motion-control';
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: corsHeaders });
+}
+
 export async function POST(request: Request) {
   try {
     const apiKey = process.env.KIE_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
         { error: 'KIE_API_KEY is not configured' },
-        { status: 503 }
+        { status: 503, headers: corsHeaders }
       );
     }
 
@@ -20,7 +25,10 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const { characterImageUrl, videoUrl } = body;
@@ -32,7 +40,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         { error: 'characterImageUrl and videoUrl are required strings' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -74,7 +82,7 @@ export async function POST(request: Request) {
           status: kieRes.status,
           body: text.slice(0, 500),
         },
-        { status: 502 }
+        { status: 502, headers: corsHeaders }
       );
     }
 
@@ -85,7 +93,7 @@ export async function POST(request: Request) {
           status: kieRes.status,
           details: json,
         },
-        { status: 502 }
+        { status: 502, headers: corsHeaders }
       );
     }
 
@@ -102,16 +110,16 @@ export async function POST(request: Request) {
           error: 'kie.ai response missing taskId',
           details: json,
         },
-        { status: 502 }
+        { status: 502, headers: corsHeaders }
       );
     }
 
-    return NextResponse.json({ taskId });
+    return NextResponse.json({ taskId }, { headers: corsHeaders });
   } catch (err) {
     console.error('[api/generate] failed', err);
     return NextResponse.json(
       { error: 'Generate request failed', taskId: null },
-      { status: 502 }
+      { status: 502, headers: corsHeaders }
     );
   }
 }
