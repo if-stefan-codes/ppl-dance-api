@@ -4,6 +4,8 @@ import { getPublicBaseUrl } from '@/lib/public-url';
 const DEFAULT_KIE_CREATE_URL =
   'https://api.kie.ai/api/v1/jobs/createTask';
 
+const KIE_CREATE_TASK_MODEL = 'kling-3.0/motion-control';
+
 export async function POST(request: Request) {
   try {
     const apiKey = process.env.KIE_API_KEY;
@@ -38,17 +40,20 @@ export async function POST(request: Request) {
     const url =
       process.env.KIE_CREATE_TASK_URL?.trim() || DEFAULT_KIE_CREATE_URL;
 
+    const kiePayload = {
+      model: KIE_CREATE_TASK_MODEL,
+      characterImageUrl: characterImageUrl.trim(),
+      videoUrl: videoUrl.trim(),
+      callBackUrl,
+    };
+
     const kieRes = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        characterImageUrl: characterImageUrl.trim(),
-        videoUrl: videoUrl.trim(),
-        callBackUrl,
-      }),
+      body: JSON.stringify(kiePayload),
     });
 
     const text = await kieRes.text();
