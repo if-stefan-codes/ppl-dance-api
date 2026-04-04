@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPublicBaseUrl } from '@/lib/public-url';
 
 const DEFAULT_KIE_CREATE_URL =
-  'https://api.kie.ai/v1/createTask';
+  'https://api.kie.ai/api/v1/jobs/createTask';
 
 export async function POST(request: Request) {
   try {
