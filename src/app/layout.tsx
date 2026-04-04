@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'PPL Dance Tool API',
-  description: 'kie.ai + Vercel KV/Blob helpers',
+  description: 'kie.ai motion control + Vercel Blob video storage',
 };
 
 export default function RootLayout({

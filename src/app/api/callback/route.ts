@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { saveTaskRecord } from '@/lib/blob-job';
+import { setJobStatus } from '@/lib/job-status-store';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -98,10 +98,7 @@ export async function POST(request: Request) {
       statusFromWork(primary) ||
       (videoUrl ? 'completed' : 'processing');
 
-    await saveTaskRecord(taskId, {
-      status,
-      videoUrl,
-    });
+    setJobStatus(taskId, { status, videoUrl });
 
     return NextResponse.json({ ok: true });
   } catch (err) {
