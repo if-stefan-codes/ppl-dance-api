@@ -1,16 +1,18 @@
 import { list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
-import { hasBlobToken } from '@/lib/blob-job';
+import { getBlobReadWriteToken } from '@/lib/blob-job';
 
 export async function GET() {
   try {
-    if (!hasBlobToken()) {
+    const token = getBlobReadWriteToken();
+    if (!token) {
       return NextResponse.json([]);
     }
 
     const { blobs } = await list({
       prefix: 'videos/',
       limit: 1000,
+      token,
     });
 
     const items = blobs.map((b) => ({

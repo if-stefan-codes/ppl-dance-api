@@ -6,8 +6,15 @@ export type TaskRecord = {
   createdAt: string;
 };
 
+/** Vercel Blob read/write token (SDK defaults to BLOB_READ_WRITE_TOKEN only). */
+export function getBlobReadWriteToken(): string | undefined {
+  const a = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  const b = process.env.PPL_BLOB_READ_WRITE_TOKEN?.trim();
+  return a || b || undefined;
+}
+
 export function hasBlobToken(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  return Boolean(getBlobReadWriteToken());
 }
 
 /** Blob pathname: jobs/{taskId}.json (taskId sanitized for path safety). */
@@ -17,12 +24,14 @@ export function jobJsonPathname(taskId: string): string {
 }
 
 async function readTaskRecordFromBlob(taskId: string): Promise<TaskRecord | null> {
-  if (!hasBlobToken()) return null;
+  const token = getBlobReadWriteToken();
+  if (!token) return null;
   try {
     const pathname = jobJsonPathname(taskId);
     const { blobs } = await list({
       prefix: pathname,
       limit: 20,
+      token,
     });
     const blob =
       blobs.find((b) => b.pathname === pathname) ?? blobs[0] ?? null;
@@ -50,7 +59,8 @@ export async function saveTaskRecord(
   taskId: string,
   partial: { status: string; videoUrl: string | null }
 ): Promise<void> {
-  if (!hasBlobToken()) {
+  const token = getBlobReadWriteToken();
+  if (!token) {
     return;
   }
   const pathname = jobJsonPathname(taskId);
@@ -67,6 +77,7 @@ export async function saveTaskRecord(
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
+      token,
     });
   } catch (err) {
     console.error('[blob-job] saveTaskRecord failed', err);

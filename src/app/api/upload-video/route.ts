@@ -1,12 +1,17 @@
 import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
-import { hasBlobToken } from '@/lib/blob-job';
+import { getBlobReadWriteToken } from '@/lib/blob-job';
 
 export async function POST(request: Request) {
   try {
-    if (!hasBlobToken()) {
+    const token = getBlobReadWriteToken();
+    if (!token) {
       return NextResponse.json(
-        { error: 'BLOB_READ_WRITE_TOKEN is not configured', url: null },
+        {
+          error:
+            'BLOB_READ_WRITE_TOKEN or PPL_BLOB_READ_WRITE_TOKEN is not configured',
+          url: null,
+        },
         { status: 400 }
       );
     }
@@ -40,6 +45,7 @@ export async function POST(request: Request) {
     const blob = await put(pathname, file, {
       access: 'public',
       contentType: file.type || 'video/mp4',
+      token,
     });
 
     return NextResponse.json({ url: blob.url });
