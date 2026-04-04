@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getJobStatus, setJobStatus } from '@/lib/job-status-store';
+import { getTaskRecord, saveTaskRecord } from '@/lib/blob-job';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -103,9 +103,9 @@ export async function POST(request: Request) {
       statusFromWork(primary) ||
       (videoUrl ? 'completed' : 'processing');
 
-    setJobStatus(taskId, { status, videoUrl });
-    const afterSave = getJobStatus(taskId);
-    console.log('[api/callback] setJobStatus (in-memory) result', afterSave);
+    await saveTaskRecord(taskId, { status, videoUrl });
+    const afterSave = await getTaskRecord(taskId);
+    console.log('[api/callback] saveTaskRecord (Blob) result', afterSave);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJobStatus } from '@/lib/job-status-store';
+import { getTaskRecord } from '@/lib/blob-job';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const record = getJobStatus(taskId);
-    console.log('[api/status] getJobStatus (in-memory) result', record);
+    const record = await getTaskRecord(taskId);
+    console.log('[api/status] getTaskRecord (Blob) result', record);
     if (!record) {
       return NextResponse.json(
         { error: 'Unknown taskId' },
