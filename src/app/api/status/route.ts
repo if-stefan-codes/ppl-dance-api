@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     const record = await getTaskRecord(taskId);
-    console.log('[api/status] getTaskRecord (/tmp) result', record);
+    console.log('[api/status] getTaskRecord (Redis) result', record);
     if (!record) {
       return NextResponse.json(
         { error: 'Unknown taskId' },

@@ -105,7 +105,7 @@ export async function POST(request: Request) {
 
     await saveTaskRecord(taskId, { status, videoUrl });
     const afterSave = await getTaskRecord(taskId);
-    console.log('[api/callback] saveTaskRecord (/tmp) result', afterSave);
+    console.log('[api/callback] saveTaskRecord (Redis) result', afterSave);
 
     return NextResponse.json({ ok: true });
   } catch (err) {
