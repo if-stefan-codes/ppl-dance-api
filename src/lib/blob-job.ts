@@ -20,21 +20,6 @@ export function hasBlobToken(): boolean {
   return Boolean(getBlobReadWriteToken());
 }
 
-function parseTaskRecord(data: unknown): TaskRecord | null {
-  if (data == null || typeof data !== 'object') return null;
-  const o = data as Record<string, unknown>;
-  if (typeof o.status !== 'string' || typeof o.createdAt !== 'string')
-    return null;
-  return {
-    status: o.status,
-    videoUrl:
-      typeof o.videoUrl === 'string' || o.videoUrl === null
-        ? o.videoUrl
-        : null,
-    createdAt: o.createdAt,
-  };
-}
-
 export async function saveTaskRecord(
   taskId: string,
   partial: { status: string; videoUrl: string | null }
@@ -59,9 +44,8 @@ export async function getTaskRecord(
 ): Promise<TaskRecord | null> {
   try {
     const data = await redis.get(taskId);
-    if (data == null) return null;
-    const parsed = JSON.parse(data as string) as unknown;
-    return parseTaskRecord(parsed);
+    if (!data) return null;
+    return data as TaskRecord;
   } catch (err) {
     console.error('[blob-job] getTaskRecord failed', err);
     return null;
