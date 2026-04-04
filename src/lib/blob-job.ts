@@ -1,4 +1,5 @@
-import { list, put } from '@vercel/blob';
+import fs from 'fs/promises';
+import path from 'path';
 
 export type TaskRecord = {
   status: string;
@@ -15,35 +16,18 @@ export function hasBlobToken(): boolean {
   return Boolean(getBlobReadWriteToken());
 }
 
-/** Blob pathname: jobs/{taskId}.json (taskId sanitized for path safety). */
-export function jobJsonPathname(taskId: string): string {
+function jobStatusFilePath(taskId: string): string {
   const safe = taskId.replace(/[^a-zA-Z0-9_.-]/g, '_');
-  return `jobs/${safe}.json`;
+  return path.join('/tmp', `${safe}.json`);
 }
 
-/** List prefix jobs/{sanitizedTaskId} to resolve the job JSON object. */
-export function jobListPrefix(taskId: string): string {
-  const safe = taskId.replace(/[^a-zA-Z0-9_.-]/g, '_');
-  return `jobs/${safe}`;
-}
-
-async function readTaskRecordFromBlob(taskId: string): Promise<TaskRecord | null> {
-  const token = getBlobReadWriteToken();
-  if (!token) return null;
+async function readTaskRecordFromFile(
+  taskId: string
+): Promise<TaskRecord | null> {
   try {
-    const pathname = jobJsonPathname(taskId);
-    const { blobs } = await list({
-      prefix: jobListPrefix(taskId),
-      limit: 20,
-      token,
-    });
-    const blob =
-      blobs.find((b) => b.pathname === pathname) ?? blobs[0] ?? null;
-    if (!blob) return null;
-
-    const res = await fetch(blob.downloadUrl);
-    if (!res.ok) return null;
-    const data = (await res.json()) as TaskRecord;
+    const filePath = jobStatusFilePath(taskId);
+    const raw = await fs.readFile(filePath, 'utf8');
+    const data = JSON.parse(raw) as TaskRecord;
     if (typeof data.status !== 'string' || !data.createdAt) return null;
     return {
       status: data.status,
@@ -54,7 +38,12 @@ async function readTaskRecordFromBlob(taskId: string): Promise<TaskRecord | null
       createdAt: data.createdAt,
     };
   } catch (err) {
-    console.error('[blob-job] readTaskRecordFromBlob failed', err);
+    const code =
+      err && typeof err === 'object' && 'code' in err
+        ? (err as NodeJS.ErrnoException).code
+        : undefined;
+    if (code === 'ENOENT') return null;
+    console.error('[blob-job] readTaskRecordFromFile failed', err);
     return null;
   }
 }
@@ -63,13 +52,8 @@ export async function saveTaskRecord(
   taskId: string,
   partial: { status: string; videoUrl: string | null }
 ): Promise<void> {
-  const token = getBlobReadWriteToken();
-  if (!token) {
-    return;
-  }
-  const pathname = jobJsonPathname(taskId);
   try {
-    const existing = await readTaskRecordFromBlob(taskId);
+    const existing = await readTaskRecordFromFile(taskId);
     const createdAt =
       existing?.createdAt ?? new Date().toISOString();
     const record: TaskRecord = {
@@ -77,12 +61,11 @@ export async function saveTaskRecord(
       createdAt,
     };
 
-    await put(pathname, JSON.stringify(record), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-      token,
-    });
+    await fs.writeFile(
+      jobStatusFilePath(taskId),
+      JSON.stringify(record),
+      'utf8'
+    );
   } catch (err) {
     console.error('[blob-job] saveTaskRecord failed', err);
   }
@@ -91,5 +74,5 @@ export async function saveTaskRecord(
 export async function getTaskRecord(
   taskId: string
 ): Promise<TaskRecord | null> {
-  return readTaskRecordFromBlob(taskId);
+  return readTaskRecordFromFile(taskId);
 }

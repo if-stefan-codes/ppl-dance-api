@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     const record = await getTaskRecord(taskId);
-    console.log('[api/status] getTaskRecord (Blob) result', record);
+    console.log('[api/status] getTaskRecord (/tmp) result', record);
     if (!record) {
       return NextResponse.json(
         { error: 'Unknown taskId' },
