@@ -3,6 +3,9 @@ import { getTaskRecord, saveTaskRecord } from '@/lib/blob-job';
 
 type UnknownRecord = Record<string, unknown>;
 
+/** kie.ai may send `works` as URL strings or objects. */
+type WorkItem = UnknownRecord | string;
+
 const KIE_COMPLETED_STATUSES = new Set([
   'succeed',
   'succeeded',
@@ -48,16 +51,20 @@ function normalizeKieStatus(raw: string): string {
 }
 
 /**
- * kie.ai order: works[0].url → works[0] (string) → data.video_url, then other work fields.
+ * kie.ai order: works[0] as URL string → works[0].url → data.video_url → other work fields.
  */
 function extractVideoUrl(
   payload: unknown,
-  works: UnknownRecord[],
+  works: WorkItem[],
   worksRaw: unknown[]
 ): string | null {
   const w0 = works[0];
-  if (w0) {
-    const directUrl = firstString(w0.url);
+  if (typeof w0 === 'string' && w0.trim()) {
+    return w0.trim();
+  }
+
+  if (w0 && typeof w0 === 'object') {
+    const directUrl = firstString((w0 as UnknownRecord).url);
     if (directUrl) return directUrl;
   }
 
@@ -71,12 +78,18 @@ function extractVideoUrl(
   const fromData = firstString(data?.video_url, data?.videoUrl);
   if (fromData) return fromData;
 
-  if (w0) {
-    const fromWork = videoUrlFromWork(w0);
+  if (w0 && typeof w0 === 'object') {
+    const fromWork = videoUrlFromWork(w0 as UnknownRecord);
     if (fromWork) return fromWork;
   }
 
-  return works.map(videoUrlFromWork).find(Boolean) ?? null;
+  for (const w of works) {
+    if (typeof w === 'string' && w.trim()) return w.trim();
+    const u = videoUrlFromWork(w as UnknownRecord);
+    if (u) return u;
+  }
+
+  return null;
 }
 
 function rawStatusFromPayload(
@@ -100,7 +113,7 @@ function rawStatusFromPayload(
  */
 function parseKieCallback(payload: unknown): {
   taskId: string | null;
-  works: UnknownRecord[];
+  works: WorkItem[];
   worksRaw: unknown[];
 } {
   const root = asRecord(payload);
@@ -122,10 +135,10 @@ function parseKieCallback(payload: unknown): {
     worksRaw = asRecord(root.result)?.works;
 
   const arr = Array.isArray(worksRaw) ? worksRaw : [];
-  const works: UnknownRecord[] = [];
+  const works: WorkItem[] = [];
   for (const item of arr) {
     if (typeof item === 'string' && item.trim()) {
-      works.push({ url: item.trim() });
+      works.push(item.trim());
       continue;
     }
     const w = asRecord(item);
@@ -165,7 +178,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const primary = works[0] ?? {};
+    const w0 = works[0];
+    const primary =
+      w0 != null && typeof w0 === 'object' && !Array.isArray(w0)
+        ? (w0 as UnknownRecord)
+        : {};
     const videoUrl = extractVideoUrl(payload, works, worksRaw);
 
     const rawStatus = rawStatusFromPayload(payload, primary);
