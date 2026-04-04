@@ -42,9 +42,14 @@ export async function POST(request: Request) {
 
     const kiePayload = {
       model: KIE_CREATE_TASK_MODEL,
-      characterImageUrl: characterImageUrl.trim(),
-      videoUrl: videoUrl.trim(),
       callBackUrl,
+      input: {
+        prompt: 'The character is dancing energetically.',
+        input_urls: [characterImageUrl.trim()],
+        video_urls: [videoUrl.trim()],
+        mode: '720p',
+        character_orientation: 'image',
+      },
     };
 
     const kieRes = await fetch(url, {
@@ -85,10 +90,9 @@ export async function POST(request: Request) {
     const obj = json as Record<string, unknown>;
     const data = obj.data as Record<string, unknown> | undefined;
     const taskId =
-      (typeof obj.taskId === 'string' && obj.taskId) ||
-      (data && typeof data.taskId === 'string' && data.taskId) ||
-      (data && typeof data.id === 'string' && data.id) ||
-      (typeof obj.id === 'string' && obj.id);
+      data && typeof data.taskId === 'string' && data.taskId.trim()
+        ? data.taskId.trim()
+        : undefined;
 
     if (!taskId) {
       return NextResponse.json(
