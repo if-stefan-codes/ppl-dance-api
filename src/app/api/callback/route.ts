@@ -71,32 +71,40 @@ function parseKieCallback(payload: unknown): {
 }
 
 export async function POST(request: Request) {
-  let payload: unknown;
   try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-  const { taskId, works } = parseKieCallback(payload);
+    const { taskId, works } = parseKieCallback(payload);
 
-  if (!taskId) {
+    if (!taskId) {
+      return NextResponse.json(
+        { error: 'Missing taskId in webhook payload' },
+        { status: 400 }
+      );
+    }
+
+    const primary = works[0] ?? {};
+    const videoUrl = works.map(videoUrlFromWork).find(Boolean) ?? null;
+    const status =
+      statusFromWork(primary) ||
+      (videoUrl ? 'completed' : 'processing');
+
+    await saveTaskRecord(taskId, {
+      status,
+      videoUrl,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('[api/callback] failed', err);
     return NextResponse.json(
-      { error: 'Missing taskId in webhook payload' },
-      { status: 400 }
+      { ok: false, error: 'Callback handling failed' },
+      { status: 502 }
     );
   }
-
-  const primary = works[0] ?? {};
-  const videoUrl = works.map(videoUrlFromWork).find(Boolean) ?? null;
-  const status =
-    statusFromWork(primary) ||
-    (videoUrl ? 'completed' : 'processing');
-
-  await saveTaskRecord(taskId, {
-    status,
-    videoUrl,
-  });
-
-  return NextResponse.json({ ok: true });
 }

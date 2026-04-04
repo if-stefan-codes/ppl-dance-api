@@ -1,23 +1,26 @@
 import { list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { hasBlobToken } from '@/lib/blob-job';
 
 export async function GET() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'BLOB_READ_WRITE_TOKEN is not configured' },
-      { status: 500 }
-    );
+  try {
+    if (!hasBlobToken()) {
+      return NextResponse.json([]);
+    }
+
+    const { blobs } = await list({
+      prefix: 'videos/',
+      limit: 1000,
+    });
+
+    const items = blobs.map((b) => ({
+      name: b.pathname,
+      url: b.url,
+    }));
+
+    return NextResponse.json(items);
+  } catch (err) {
+    console.error('[api/videos] list failed', err);
+    return NextResponse.json([]);
   }
-
-  const { blobs } = await list({
-    prefix: 'videos/',
-    limit: 1000,
-  });
-
-  const items = blobs.map((b) => ({
-    name: b.pathname,
-    url: b.url,
-  }));
-
-  return NextResponse.json(items);
 }
