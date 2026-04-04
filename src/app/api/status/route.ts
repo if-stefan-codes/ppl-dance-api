@@ -4,6 +4,7 @@ import { getJobStatus } from '@/lib/job-status-store';
 export async function GET(request: NextRequest) {
   try {
     const taskId = request.nextUrl.searchParams.get('taskId')?.trim();
+    console.log('[api/status] taskId query param', taskId ?? '(missing)');
     if (!taskId) {
       return NextResponse.json(
         { error: 'taskId query parameter is required' },
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     const record = getJobStatus(taskId);
+    console.log('[api/status] getJobStatus (in-memory) result', record);
     if (!record) {
       return NextResponse.json(
         { error: 'Unknown taskId' },

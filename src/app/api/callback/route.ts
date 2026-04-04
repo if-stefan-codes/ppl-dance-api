@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { setJobStatus } from '@/lib/job-status-store';
+import { getJobStatus, setJobStatus } from '@/lib/job-status-store';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -76,14 +76,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const rawBody = await request.text();
+    console.log('[api/callback] raw request body', rawBody);
+
     let payload: unknown;
     try {
-      payload = await request.json();
-    } catch {
+      payload = rawBody.trim() ? JSON.parse(rawBody) : null;
+    } catch (parseErr) {
+      console.log('[api/callback] JSON parse failed', parseErr);
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
     const { taskId, works } = parseKieCallback(payload);
+    console.log('[api/callback] extracted taskId', taskId);
 
     if (!taskId) {
       return NextResponse.json(
@@ -99,6 +104,8 @@ export async function POST(request: Request) {
       (videoUrl ? 'completed' : 'processing');
 
     setJobStatus(taskId, { status, videoUrl });
+    const afterSave = getJobStatus(taskId);
+    console.log('[api/callback] setJobStatus (in-memory) result', afterSave);
 
     return NextResponse.json({ ok: true });
   } catch (err) {
