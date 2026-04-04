@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { getBlobReadWriteToken } from '@/lib/blob-job';
 
 export async function POST(request: Request) {
-  console.log('[api/upload-video] BLOB_READ_WRITE_TOKEN', process.env.BLOB_READ_WRITE_TOKEN);
   console.log('[api/upload-video] PPL_BLOB_READ_WRITE_TOKEN', process.env.PPL_BLOB_READ_WRITE_TOKEN);
 
   try {
@@ -11,8 +10,7 @@ export async function POST(request: Request) {
     if (!token) {
       return NextResponse.json(
         {
-          error:
-            'BLOB_READ_WRITE_TOKEN or PPL_BLOB_READ_WRITE_TOKEN is not configured',
+          error: 'PPL_BLOB_READ_WRITE_TOKEN is not configured',
           url: null,
         },
         { status: 400 }

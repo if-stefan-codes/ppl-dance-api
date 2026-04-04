@@ -7,9 +7,7 @@ export type TaskRecord = {
 };
 
 export function getBlobReadWriteToken(): string | undefined {
-  const token =
-    process.env.BLOB_READ_WRITE_TOKEN || process.env.PPL_BLOB_READ_WRITE_TOKEN;
-  const trimmed = token?.trim();
+  const trimmed = process.env.PPL_BLOB_READ_WRITE_TOKEN?.trim();
   return trimmed || undefined;
 }
 
