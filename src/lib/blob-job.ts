@@ -1,4 +1,4 @@
-import { list, put } from '@vercel/blob';
+import { list, put, type PutCommandOptions } from '@vercel/blob';
 
 export type TaskRecord = {
   status: string;
@@ -77,12 +77,16 @@ export async function saveTaskRecord(
       createdAt,
     };
 
-    await put(pathname, JSON.stringify(record), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-      token,
-    });
+    await put(
+      pathname,
+      JSON.stringify(record),
+      {
+        access: 'private',
+        contentType: 'application/json',
+        addRandomSuffix: false,
+        token,
+      } as unknown as PutCommandOptions
+    );
   } catch (err) {
     console.error('[blob-job] saveTaskRecord failed', err);
   }
