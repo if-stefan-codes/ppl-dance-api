@@ -52,6 +52,8 @@ export async function POST(request: Request) {
       },
     };
 
+    console.log('[api/generate] kiePayload', JSON.stringify(kiePayload, null, 2));
+
     const kieRes = await fetch(url, {
       method: 'POST',
       headers: {
