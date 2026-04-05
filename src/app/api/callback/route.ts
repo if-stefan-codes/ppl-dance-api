@@ -148,6 +148,43 @@ function parseKieCallback(payload: unknown): {
   return { taskId, works, worksRaw: arr };
 }
 
+function logKieWebhookDebug(rawBody: string, payload: unknown) {
+  const byteLength = Buffer.byteLength(rawBody, 'utf8');
+  console.log('[api/callback] kie.ai webhook — raw body byte length', byteLength);
+  console.log('[api/callback] kie.ai webhook — FULL raw body (exact bytes from request)', rawBody);
+
+  const root = asRecord(payload);
+  if (!root) {
+    console.log(
+      '[api/callback] kie.ai webhook — parsed payload is not a plain object',
+      payload
+    );
+    return;
+  }
+
+  const data = asRecord(root.data);
+  const result = asRecord(root.result);
+
+  const logWorksSlot = (path: string, value: unknown) => {
+    const present = value !== undefined && value !== null;
+    const isArr = Array.isArray(value);
+    console.log(`[api/callback] kie.ai webhook — ${path}`, {
+      path,
+      present,
+      isArray: isArr,
+      typeof: typeof value,
+      itemTypes: isArr
+        ? (value as unknown[]).map((x) => typeof x)
+        : undefined,
+      json: present ? JSON.stringify(value) : '(absent)',
+    });
+  };
+
+  logWorksSlot('root.works (top-level)', root.works);
+  logWorksSlot('data.works (nested under data)', data?.works);
+  logWorksSlot('result.works (nested under result)', result?.works);
+}
+
 export async function GET() {
   return new NextResponse(null, { status: 200 });
 }
@@ -155,21 +192,27 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
-    console.log(
-      '[api/callback] full raw kie.ai request body',
-      rawBody
-    );
 
     let payload: unknown;
     try {
       payload = rawBody.trim() ? JSON.parse(rawBody) : null;
     } catch (parseErr) {
       console.log('[api/callback] JSON parse failed', parseErr);
+      console.log(
+        '[api/callback] kie.ai webhook — FULL raw body (unparsed)',
+        rawBody
+      );
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
+    logKieWebhookDebug(rawBody, payload);
+
     const { taskId, works, worksRaw } = parseKieCallback(payload);
     console.log('[api/callback] extracted taskId', taskId);
+    console.log('[api/callback] merged works used by handler (after parseKieCallback)', {
+      worksRawLength: worksRaw.length,
+      worksJson: JSON.stringify(works),
+    });
 
     if (!taskId) {
       return NextResponse.json(
