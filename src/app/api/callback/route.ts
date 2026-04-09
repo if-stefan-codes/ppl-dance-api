@@ -148,6 +148,63 @@ function parseKieCallback(payload: unknown): {
   return { taskId, works, worksRaw: arr };
 }
 
+const KIE_FETCH_TASK_BASE = 'https://api.kie.ai/api/v1/jobs/fetchTask';
+
+/**
+ * After completion, Kie may omit video URL in the webhook — refresh from fetchTask.
+ * Extract URL only from works[0] as a string or { url }.
+ */
+function videoUrlFromFetchTaskWorks(json: unknown): string | null {
+  const root = asRecord(json);
+  if (!root) return null;
+
+  let worksRaw: unknown = root.works;
+  if (worksRaw == null && root.data != null) {
+    worksRaw = asRecord(root.data)?.works;
+  }
+
+  const arr = Array.isArray(worksRaw) ? worksRaw : [];
+  const w0 = arr[0];
+  if (typeof w0 === 'string' && w0.trim()) return w0.trim();
+  const w0o = asRecord(w0);
+  if (w0o) {
+    const u = firstString(w0o.url);
+    if (u) return u;
+  }
+  return null;
+}
+
+async function fetchKieTaskAndMaybeVideoUrl(taskId: string): Promise<string | null> {
+  const apiKey = process.env.KIE_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn('[api/callback] KIE_API_KEY missing; skip fetchTask');
+    return null;
+  }
+
+  const url = `${KIE_FETCH_TASK_BASE}?taskId=${encodeURIComponent(taskId)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    json = null;
+  }
+
+  console.log(
+    '[api/callback] kie fetchTask full JSON response',
+    JSON.stringify(json)
+  );
+
+  if (!res.ok) {
+    console.warn('[api/callback] fetchTask non-OK status', res.status);
+  }
+
+  return videoUrlFromFetchTaskWorks(json);
+}
+
 function logKieWebhookDebug(rawBody: string, payload: unknown) {
   const byteLength = Buffer.byteLength(rawBody, 'utf8');
   console.log('[api/callback] kie.ai webhook — raw body byte length', byteLength);
@@ -238,6 +295,21 @@ export async function POST(request: Request) {
     await saveTaskRecord(taskId, { status, videoUrl });
     const afterSave = await getTaskRecord(taskId);
     console.log('[api/callback] saveTaskRecord (Redis) result', afterSave);
+
+    if (status === 'completed') {
+      const fromFetch = await fetchKieTaskAndMaybeVideoUrl(taskId);
+      if (fromFetch) {
+        await saveTaskRecord(taskId, {
+          status: 'completed',
+          videoUrl: fromFetch,
+        });
+        const afterFetch = await getTaskRecord(taskId);
+        console.log(
+          '[api/callback] Redis after fetchTask videoUrl update',
+          afterFetch
+        );
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
