@@ -1,9 +1,4 @@
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+import { jobKey, redis } from '@/lib/redis';
 
 export type TaskRecord = {
   status: string;
@@ -33,19 +28,37 @@ export async function saveTaskRecord(
       createdAt,
     };
 
-    await redis.set(taskId, JSON.stringify(record), { ex: 86400 });
+    const key = jobKey(taskId);
+    await redis.set(key, JSON.stringify(record), { ex: 86400 });
   } catch (err) {
     console.error('[blob-job] saveTaskRecord failed', err);
   }
+}
+
+function coerceTaskRecord(data: unknown): TaskRecord | null {
+  if (data == null) return null;
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data) as TaskRecord;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    return data as TaskRecord;
+  }
+  return null;
 }
 
 export async function getTaskRecord(
   taskId: string
 ): Promise<TaskRecord | null> {
   try {
-    const data = await redis.get(taskId);
-    if (!data) return null;
-    return data as TaskRecord;
+    let data = await redis.get(jobKey(taskId));
+    if (data == null) {
+      data = await redis.get(taskId);
+    }
+    return coerceTaskRecord(data);
   } catch (err) {
     console.error('[blob-job] getTaskRecord failed', err);
     return null;
