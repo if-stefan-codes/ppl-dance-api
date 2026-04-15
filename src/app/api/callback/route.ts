@@ -249,7 +249,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
-    console.log('[FULL KIE CALLBACK BODY]', rawBody);
+    console.log('[FULL CALLBACK]', rawBody);
 
     let payload: unknown;
     try {

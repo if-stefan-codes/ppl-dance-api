@@ -64,7 +64,7 @@ async function fetchTaskVideoUrl(taskId: string): Promise<string | null> {
   return videoUrlFromFetchTaskWorks(json);
 }
 
-export async function GET() {
+async function runCronJob(): Promise<NextResponse> {
   try {
     const apiKey = process.env.KIE_API_KEY?.trim();
     if (!apiKey) {
@@ -127,4 +127,13 @@ export async function GET() {
       { status: 502 }
     );
   }
+}
+
+export async function GET() {
+  return runCronJob();
+}
+
+/** Manual trigger (Vercel Cron still uses GET). */
+export async function POST() {
+  return runCronJob();
 }
