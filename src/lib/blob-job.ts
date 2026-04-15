@@ -29,8 +29,8 @@ export async function saveTaskRecord(
     };
 
     const payload = JSON.stringify(record);
-    await redis.set(taskId, payload, { ex: 86400 });
-    await redis.set(jobKey(taskId), payload, { ex: 86400 });
+    await redis.set(taskId, payload, { ex: 604800 });
+    await redis.set(jobKey(taskId), payload, { ex: 604800 });
   } catch (err) {
     console.error('[blob-job] saveTaskRecord failed', err);
   }
