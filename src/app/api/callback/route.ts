@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTaskRecord, saveTaskRecord } from '@/lib/blob-job';
+import { redis } from '@/lib/redis';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -250,6 +251,7 @@ export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
     console.log("[FULL KIE CALLBACK]", rawBody);
+    await redis.set(`debug:callback:${Date.now()}`, rawBody, { ex: 3600 });
 
     let payload: unknown;
     try {
