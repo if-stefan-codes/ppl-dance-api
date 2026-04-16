@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { corsHeaders } from '@/lib/cors';
 import { getPublicBaseUrl } from '@/lib/public-url';
+import { redis } from '@/lib/redis';
 
 const DEFAULT_KIE_CREATE_URL =
   'https://api.kie.ai/api/v1/jobs/createTask';
@@ -113,6 +114,20 @@ export async function POST(request: Request) {
         { status: 502, headers: corsHeaders }
       );
     }
+
+    const inputVideoUrl = videoUrl.trim();
+    await redis.set(
+      taskId,
+      JSON.stringify({
+        taskId,
+        status: 'pending',
+        videoUrl: null,
+        createdAt: new Date().toISOString(),
+        characterImageUrl: characterImageUrl.trim(),
+        inputVideoUrl,
+      }),
+      { ex: 604800 }
+    );
 
     return NextResponse.json({ taskId }, { headers: corsHeaders });
   } catch (err) {
