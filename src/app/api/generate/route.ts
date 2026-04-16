@@ -115,7 +115,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const inputVideoUrl = videoUrl.trim();
     await redis.set(
       taskId,
       JSON.stringify({
@@ -123,8 +122,6 @@ export async function POST(request: Request) {
         status: 'pending',
         videoUrl: null,
         createdAt: new Date().toISOString(),
-        characterImageUrl: characterImageUrl.trim(),
-        inputVideoUrl,
       }),
       { ex: 604800 }
     );

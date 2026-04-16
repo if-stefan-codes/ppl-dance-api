@@ -90,6 +90,25 @@ function extractVideoUrl(
     if (u) return u;
   }
 
+  const dw = data?.works;
+  if (Array.isArray(dw) && typeof dw[0] === 'string' && dw[0].trim()) {
+    return dw[0].trim();
+  }
+
+  const out = root?.output;
+  if (Array.isArray(out) && typeof out[0] === 'string' && out[0].trim()) {
+    return out[0].trim();
+  }
+
+  const dataOut = data?.output;
+  if (
+    Array.isArray(dataOut) &&
+    typeof dataOut[0] === 'string' &&
+    dataOut[0].trim()
+  ) {
+    return dataOut[0].trim();
+  }
+
   return null;
 }
 
